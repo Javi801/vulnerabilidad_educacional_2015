@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Pregunta A.1</title>
+        <!-- Load d3.js -->
+        <script src="https://d3js.org/d3.v4.js"></script>
+    </head>
+<body>
+
+    <!-- Load color scale -->
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+    <!-- Create a div where the graph will take place -->
+    <div id="my_dataviz"></div>
+
+    <!-- A bit of CSS: change stroke color of circle on hover (white -> black) -->
+    <style>
+    .bubbles {
+      stroke-width: 1px;
+      stroke: white;
+      opacity: .6
+    }
+    .bubbles:hover {
+      stroke: black;
+    }
+    .tooltip {
+        opacity: 0;
+        position: absolute;
+        top: -4px;
+        left: 0;
+        padding: 0.6em 1em;
+        background: #fff;
+        text-align: center;
+        border: 1px solid #ddd;
+        z-index: 10;
+        transition: all 0.2s ease-out;
+        pointer-events: none;
+    }
+    </style>
+
+    <script>
+
+    // set the dimensions and margins of the graph
+    var margin = {
+      top: 70,
+      right: 150,
+      bottom: 60,
+      left: 30
+    },
+        width = 900 - margin.left - margin.right,
+        width_g = width + 100,
+        height = 500 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+      .append("svg")
+        .attr("width", width_g + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+
+    //Read the data
+    d3.csv("a1_datos.csv", function(data) {
+
+      // ---------------------------//
+      //       AXIS  AND SCALE      //
+      // ---------------------------//
+
+      // Add X axis
+      var x = d3.scaleLinear()
+        .domain([0, d3.max(data, function(d) {
+            return +d.v1
+        })])
+        .range([ 0, width ]);
+      svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x).ticks(3));
+
+      // Add X axis label:
+      svg.append("text")
+          .attr("text-anchor", "end")
+          .attr("x", width)
+          .attr("y", height+50 )
+          .text("Total de matriculados");
+
+      // Add Y axis
+      var y = d3.scaleLinear()
+        .domain([0, d3.max(data, function(d) {
+            return +d.v2
+        })])
+        .range([ height, 0]);
+      svg.append("g")
+        .call(d3.axisLeft(y));
+
+      // Add Y axis label:
+      svg.append("text")
+          .attr("text-anchor", "end")
+          .attr("x", 0)
+          .attr("y", -20 )
+          .text("Porcentaje de vulnerabilidad")
+          .attr("text-anchor", "start")
+
+      // Add a scale for bubble size
+      var z = d3.scaleSqrt()
+        .domain([0, d3.max(data, function(d) {
+            return +d.v3
+        })])
+        .range([ 2, 30]);
+
+      // Add a scale for bubble color
+      var myColor = d3.scaleOrdinal()
+        .domain(d3.map(data, function(d){return d.v4;}).keys())
+        .range(d3.schemeSet2);
+
+      // ---------------------------//
+      //      TOOLTIP               //
+      // ---------------------------//
+
+      // -1- Create a tooltip div that is hidden by default:
+      var tooltip = d3.select("#my_dataviz")
+        .append("div")
+          .style("opacity", 0)
+          .attr("class", "tooltip")
+          .style("background-color", "black")
+          .style("border-radius", "5px")
+          .style("padding", "10px")
+          .style("color", "white")
+
+      // -2- Create 3 functions to show / update (when mouse move but stay on same circle) / hide the tooltip
+      var showTooltip = function(d) {
+        tooltip
+          .transition()
+          .duration(200)
+        tooltip
+          .style("opacity", 1)
+          .html("Colegio con dependencia tipo " + d.v4 + ", " + d.v3 + "% de alumnos con primera prioridad")
+          .style("left", (d3.mouse(this)[0]+30) + "px")
+          .style("top", (d3.mouse(this)[1]+30) + "px")
+      }
+      var moveTooltip = function(d) {
+        tooltip
+          .style("left", (d3.mouse(this)[0]+50) + "px")
+          .style("top", (d3.mouse(this)[1]+30) + "px")
+      }
+      var hideTooltip = function(d) {
+        tooltip
+          .transition()
+          .duration(200)
+          .style("opacity", 0)
+      }
+
+      // ---------------------------//
+      //       CIRCLES              //
+      // ---------------------------//
+
+      // Add dots
+      svg.append('g')
+        .selectAll("dot")
+        .data(data)
+        .enter()
+        .append("circle")
+          .attr("class", function(d) { return "bubbles " + d.v4.replace(/\s/g, '') })
+          .attr("id", function(d) { return "bubbles" + d.v4.replace(/\s/g, '') })
+          .attr("cx", function (d) { return x(d.v1); } )
+          .attr("cy", function (d) { return y(d.v2); } )
+          .attr("r", function (d) { return z(d.v3/90); } )
+          .style("fill", function (d) { return myColor(d.v4); } )
+        // -3- Trigger the functions for hover
+        .on("mouseover", showTooltip )
+        .on("mousemove", moveTooltip )
+        .on("mouseleave", hideTooltip )
+
+
+        // ---------------------------//
+        //       HIGHLIGHT GROUP      //
+        // ---------------------------//
+
+        // What to do when one group is hovered
+        var highlight = function(d){
+          // reduce opacity of all groups
+          d3.selectAll(".bubbles").style("opacity", .05)
+          // expect the one that is hovered
+          d3.selectAll("#bubbles"+d.replace(/\s/g, '')).style("opacity", 1)
+        }
+
+        // And when it is not hovered anymore
+        var noHighlight = function(d){
+          d3.selectAll(".bubbles").style("opacity", 0.5)
+        }
+
+
+        // ---------------------------//
+        //       LEGEND              //
+        // ---------------------------//
+        var xCircle = 390
+        var xLabel = 440
+        var valuesToShow = d3.map(data, function(d){return d.v4;})
+
+        // Add legend: labels
+        svg
+          .selectAll("legend")
+          .data(valuesToShow)
+          .enter()
+          .append("text")
+            .attr('x', xLabel)
+            .attr('y', function(d){ return height - 100 - z(d) } )
+            .text( function(d){ return d/1000000 } )
+            .style("font-size", 10)
+            .attr('alignment-baseline', 'middle')
+
+        // Add one dot in the legend for each name.
+        var x_position = 750
+        var size = 20
+        var allgroups = d3.map(data, function(d){return d.v4;}).keys()//["Municipal - DAEM", "Particular Subvencionado", "Municipal - Corporacion", "Administracion delegada"]
+        svg.selectAll("myrect")
+          .data(allgroups)
+          .enter()
+          .append("circle")
+            .attr("cx", x_position)
+            .attr("cy", function(d,i){ return 10 + i*(size+5)}) // 100 is where the first dot appears. 25 is the distance between dots
+            .attr("r", 7)
+            .style("fill", function(d){ return myColor(d)})
+            .on("mouseover", highlight)
+            .on("mouseleave", noHighlight)
+
+        // Add labels beside legend dots
+        svg.selectAll("mylabels")
+          .data(allgroups)
+          .enter()
+          .append("text")
+            .attr("x", x_position + size*.8)
+            .attr("y", function(d,i){ return i * (size + 5) + (size/2)}) // 100 is where the first dot appears. 25 is the distance between dots
+            .style("fill", function(d){ return myColor(d)})
+            .text(function(d){ return d})
+            .attr("text-anchor", "left")
+            .style("alignment-baseline", "middle")
+            .on("mouseover", highlight)
+            .on("mouseleave", noHighlight)
+      })
+
+      // ---------------------------//
+      //         TITLE              //
+      // ---------------------------//
+      svg.append("text")
+        .attr("x", (width / 2))
+        .attr("y", 0 - ((margin.top / 3)*2))
+        .attr("text-anchor", "middle")
+        .style("font-size", "20px")
+        .style("text-decoration", "underline")
+        .text("Vulnerabilidad en los establecimientos de Educación Básica");
+      </script>
+  </body>
+</html>
